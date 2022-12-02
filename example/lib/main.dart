@@ -21,6 +21,8 @@ void main() {
     SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
   );
   AssetPicker.registerObserve();
+  // Enables logging with the photo_manager.
+  PhotoManager.setLog(true);
 }
 
 class MyApp extends StatelessWidget {
@@ -49,11 +51,6 @@ class MyApp extends StatelessWidget {
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const <Locale>[
-        Locale('zh'), // Chinese
-        // Locale('iw'), // Hebrew
-      ],
-      locale: const Locale('zh'),
     );
   }
 }

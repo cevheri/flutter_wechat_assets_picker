@@ -8,7 +8,7 @@ that can be found in the LICENSE file. -->
 [![pub package](https://img.shields.io/pub/v/wechat_assets_picker?color=42a012&include_prereleases&label=%E5%BC%80%E5%8F%91%E7%89%88&logo=dart&style=flat-square)](https://pub.flutter-io.cn/packages/wechat_assets_picker)
 [![Build status](https://img.shields.io/github/workflow/status/fluttercandies/flutter_wechat_assets_picker/Build%20test?label=%E7%8A%B6%E6%80%81&logo=github&style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/actions?query=workflow%3A%22Build+test%22)
 [![CodeFactor](https://img.shields.io/codefactor/grade/github/fluttercandies/flutter_wechat_assets_picker?label=%E4%BB%A3%E7%A0%81%E8%B4%A8%E9%87%8F&logo=codefactor&logoColor=%23ffffff&style=flat-square)](https://www.codefactor.io/repository/github/fluttercandies/flutter_wechat_assets_picker)
-[![GitHub license](https://img.shields.io/github/license/fluttercandies/flutter_wechat_assets_picker?label=%E5%8D%8F%E8%AE%AE&style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/blob/master/LICENSE)
+[![GitHub license](https://img.shields.io/github/license/fluttercandies/flutter_wechat_assets_picker?label=%E5%8D%8F%E8%AE%AE&style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/blob/main/LICENSE)
 
 [![Awesome Flutter](https://img.shields.io/badge/Awesome-Flutter-blue.svg?longCache=true&style=flat-square)](https://github.com/Solido/awesome-flutter)
 [![GitHub stars](https://img.shields.io/github/stars/fluttercandies/flutter_wechat_assets_picker?logo=github&style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/stargazers)
@@ -41,12 +41,14 @@ Language: [English](README.md) | 中文
   * [版本兼容](#版本兼容)
   * [Flutter](#flutter)
   * [Android](#android)
+    * [权限](#权限)
   * [iOS](#ios)
   * [macOS](#macos)
 * [使用方法](#使用方法-)
   * [简单的使用方法](#简单的使用方法)
-  * [使用自定义代理](#使用自定义代理)
   * [更详细的使用方法](#更详细的使用方法)
+  * [国际化](#国际化)
+  * [使用自定义代理](#使用自定义代理)
   * [展示选中的资源](#展示选中的资源)
   * [注册资源变化回调](#注册资源变化回调)
   * [自定义类型或 UI](#自定义类型或-ui)
@@ -69,13 +71,14 @@ Language: [English](README.md) | 中文
   - 🔬 HEIF 格式图片支持
 - 🎥 视频资源支持
 - 🎶 音频资源支持
+  - ⚠️ 由于 iOS/macOS 系统限制，仅支持应用沙盒内获取音频资源
 - 1️⃣ 单资源模式
 - 💱 国际化支持
   - ⏪ RTL 语言支持
-- ➕ 特殊 widget 构建支持（前置/后置）
+- ➕ 特殊 widget 构建支持
 - 🗂 自定义路径排序支持
 - 📝 自定义文本构建支持
-- ⏳ 自定义筛选规则支持（ `photo_manager` ）
+- ⏳ 自定义筛选规则支持
 - 🎏 完整的自定义主题
 - 💻 支持 MacOS
 
@@ -101,11 +104,12 @@ Language: [English](README.md) | 中文
 
 ### 版本兼容
 
-|        | 2.8.0 | 2.10.0 | 3.0.0 |
-|--------|:-----:|:------:|:-----:|
-| 7.3.0+ |  不适用  |  不适用   |   ✅   |
-| 7.0.0+ |   ✅   |   ✅    |   ❌   |
-| 6.3.0+ |   ✅   |   ✅    |   ❌   |
+|        | 2.8.0 | 2.10.0 | 3.0.0 | 3.3.0 |
+|--------|:-----:|:------:|:-----:|:-----:|
+| 8.0.0+ |  不适用  |  不适用   |   ✅   |   ✅   |
+| 7.3.0+ |  不适用  |  不适用   |   ✅   |   ✅   |
+| 7.0.0+ |   ✅   |   ✅    |   ❌   |   ❌   |
+| 6.3.0+ |   ✅   |   ✅    |   ❌   |   ❌   |
 
 如果在 `flutter pub get` 时遇到了 `resolve conflict` 失败问题，
 请使用 `dependency_overrides` 解决。
@@ -134,31 +138,53 @@ import 'package:wechat_assets_picker/wechat_assets_picker.dart';
 
 ### Android
 
-需要声明的权限：`READ_EXTERNAL_STORAGE`（已声明）.
-可选声明的权限：`WRITE_EXTERNAL_STORAGE`、`ACCESS_MEDIA_LOCATION`.
-
-如果你的目标 SDK 版本大于 29，
-你必须声明在 `AndroidManifest.xml` 的 `<application>` 节点中
-声明 `requestLegacyExternalStorage`。
-详情请参考示例。
-
 如果你发现有一些与 `Glide` 有关的警告日志输出，
 那么主项目就需要实现 `AppGlideModule`。
 详细信息请查看 [Generated API 文档][]。
 
+#### 权限
+
+在使用这个 package 时，请确保
+`compileSdkVersion` 和 `targetSdkVersion` 升级到 `33`。
+否则，在 Android 13 设备上将有可能无法加载任何资源。
+
+| Name                     | 必需  | 已声明 | 最高 API 版本 | 其他          |
+|--------------------------|-----|-----|-----------|-------------|
+| `READ_EXTERNAL_STORAGE`  | 是   | 是   | 32        |             |
+| `WRITE_EXTERNAL_STORAGE` | 否   | 否   | 29        |             |
+| `ACCESS_MEDIA_LOCATION`  | 是*  | 否   | N/A       | 读取 EXIF 时必需 |
+| `READ_MEDIA_IMAGES`      | 是*  | 是   | N/A       | 读取图片时必需     | 
+| `READ_MEDIA_VIDEO`       | 是*  | 是   | N/A       | 读取视频时必需     | 
+| `READ_MEDIA_AUDIO`       | 是*  | 是   | N/A       | 读取音频时必需     |
+
+如果你的目标 SDK 版本大于 33，且你不需要获取图片、视频或者音频，
+你可以考虑将对应权限移除：
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.your.app">
+    <!-- 如果不需要获取图片，移除 READ_MEDIA_IMAGES -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <!-- 如果不需要获取视频，移除 READ_MEDIA_VIDEO -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
+    <!-- 如果不需要获取音频，移除 READ_MEDIA_AUDIO -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove" />
+</manifest>
+```
+
 ### iOS
 
 1. 在 `ios/Podfile` 中指定最低构建版本至 **9.0**。
-```ruby
-platform :ios, '9.0'
-```
-
+   ```ruby
+   platform :ios, '9.0'
+   ```
 2. 将以下内容添加至 `info.plist`。
 ```plist
 <key>NSAppTransportSecurity</key>
 <dict>
 	<key>NSAllowsArbitraryLoads</key>
-  <true/>
+	<true/>
 </dict>
 <key>NSPhotoLibraryUsageDescription</key>
 <string>你的相册权限描述</string>
@@ -167,9 +193,9 @@ platform :ios, '9.0'
 ### macOS
 
 1. 在 `macos/Podfile` 中指定最低构建版本至 **10.15**。
-```ruby
-platform :osx, '10.15'
-```
+   ```ruby
+   platform :osx, '10.15'
+   ```
 2. 使用 **Xcode** 打开 `macos/Runner.xcworkspace`。
    接着根据下面的截图将最低构建版本提升至 **10.15**。
 3. ![step 1](https://tva1.sinaimg.cn/large/007S8ZIlgy1ghw67v4yk4j30qy0b50u0.jpg)
@@ -195,34 +221,54 @@ final List<AssetEntity>? result = await AssetPicker.pickAssets(
 
 `AssetPickerConfig` 的成员说明：
 
-| 参数名                               | 类型                                   | 描述                          | 默认值                         |
-|-----------------------------------|--------------------------------------|-----------------------------|-----------------------------|
-| selectedAssets                    | `List<AssetEntity>?`                 | 已选的资源。确保不重复选择。              | `null`                      |
-| maxAssets                         | `int`                                | 最多选择的图片数量                   | 9                           |
-| pageSize                          | `int`                                | 分页加载时每页加载的资源数量。**必须为网格数的倍数。 | 80                          |
-| gridThumbnailSize                 | `ThumbnailSize`                      | 预览网格的缩略图大小                  | `ThumbnailSize.square(200)` |
-| pathThumbnailSize                 | `ThumbnailSize`                      | 路径选择器的缩略图大小                 | `ThumbnailSize.square(80)`  |
-| previewThumbnailSize              | `ThumbnailSize?`                     | 预览时图片的缩略图大小                 | `null`                      |
-| requestType                       | `RequestType`                        | 选择器选择资源的类型                  | `RequestType.common`        |
-| specialPickerType                 | `SpecialPickerType?`                 | 提供一些特殊的选择器类型以整合非常规的选择行为     | `null`                      |
-| keepScrollOffset                  | `bool`                               | 选择器是否可以从同样的位置开始选择           | `null`                      |
-| sortPathDelegate                  | `SortPathDelegate<AssetPathEntity>?` | 资源路径的排序实现，可自定义路径排序方法        | `CommonSortPathDelegate`    |
-| filterOptions                     | `FilterOptionGroup?`                 | 允许用户自定义资源过滤条件               | `null`                      |
-| gridCount                         | `int`                                | 选择器网格数量                     | 4                           |
-| themeColor                        | `Color?`                             | 选择器的主题色                     | `Color(0xff00bc56)`         |
-| pickerTheme                       | `ThemeData?`                         | 选择器的主题提供，包括查看器              | `null`                      |
-| textDelegate                      | `AssetPickerTextDelegate?`           | 选择器的文本代理构建，用于自定义文本          | `AssetPickerTextDelegate()` |
-| specialItemPosition               | `SpecialItemPosition`                | 允许用户在选择器中添加一个自定义item，并指定位置。 | `SpecialPosition.none`      |
-| specialItemBuilder                | `SpecialItemBuilder?`                | 自定义item的构造方法                | `null`                      |
-| loadingIndicatorBuilder           | `IndicatorBuilder?`                  | 加载器的实现                      | `null`                      |
-| selectPredicate                   | `AssetSelectPredicate`               | 判断资源可否被选择                   | `null`                      |
-| shouldRevertGrid                  | `bool?`                              | 判断资源网格是否需要倒序排列              | `null`                      |
-| limitedPermissionOverlayPredicate | `LimitedPermissionOverlayPredicate?` | 判断有限的权限情况下是否展示提示页面          | `null`                      |
-| pathNameBuilder                   | `PathNameBuilder<AssetPathEntity>?`  | 构建自定义路径名称                   | `null`                      |
+| 参数名                               | 类型                                   | 描述                                                   | 默认值                         |
+|-----------------------------------|--------------------------------------|------------------------------------------------------|-----------------------------|
+| selectedAssets                    | `List<AssetEntity>?`                 | 已选的资源。确保不重复选择。                                       | `null`                      |
+| maxAssets                         | `int`                                | 最多选择的图片数量                                            | 9                           |
+| pageSize                          | `int`                                | 分页加载时每页加载的资源数量。**必须为网格数的倍数。                          | 80                          |
+| gridThumbnailSize                 | `ThumbnailSize`                      | 预览网格的缩略图大小                                           | `ThumbnailSize.square(200)` |
+| pathThumbnailSize                 | `ThumbnailSize`                      | 路径选择器的缩略图大小                                          | `ThumbnailSize.square(80)`  |
+| previewThumbnailSize              | `ThumbnailSize?`                     | 预览时图片的缩略图大小                                          | `null`                      |
+| requestType                       | `RequestType`                        | 选择器选择资源的类型                                           | `RequestType.common`        |
+| specialPickerType                 | `SpecialPickerType?`                 | 提供一些特殊的选择器类型以整合非常规的选择行为                              | `null`                      |
+| keepScrollOffset                  | `bool`                               | 选择器是否可以从同样的位置开始选择                                    | `null`                      |
+| sortPathDelegate                  | `SortPathDelegate<AssetPathEntity>?` | 资源路径的排序实现，可自定义路径排序方法                                 | `CommonSortPathDelegate`    |
+| sortPathsByModifiedDate           | `bool`                               | 是否结合 `FilterOptionGroup.containsPathModified` 进行路径排序 | `false`                     |
+| filterOptions                     | `FilterOptionGroup?`                 | 允许用户自定义资源过滤条件                                        | `null`                      |
+| gridCount                         | `int`                                | 选择器网格数量                                              | 4                           |
+| themeColor                        | `Color?`                             | 选择器的主题色                                              | `Color(0xff00bc56)`         |
+| pickerTheme                       | `ThemeData?`                         | 选择器的主题提供，包括查看器                                       | `null`                      |
+| textDelegate                      | `AssetPickerTextDelegate?`           | 选择器的文本代理构建，用于自定义文本                                   | `AssetPickerTextDelegate()` |
+| specialItemPosition               | `SpecialItemPosition`                | 允许用户在选择器中添加一个自定义item，并指定位置。                          | `SpecialPosition.none`      |
+| specialItemBuilder                | `SpecialItemBuilder?`                | 自定义item的构造方法                                         | `null`                      |
+| loadingIndicatorBuilder           | `IndicatorBuilder?`                  | 加载器的实现                                               | `null`                      |
+| selectPredicate                   | `AssetSelectPredicate`               | 判断资源可否被选择                                            | `null`                      |
+| shouldRevertGrid                  | `bool?`                              | 判断资源网格是否需要倒序排列                                       | `null`                      |
+| limitedPermissionOverlayPredicate | `LimitedPermissionOverlayPredicate?` | 判断有限的权限情况下是否展示提示页面                                   | `null`                      |
+| pathNameBuilder                   | `PathNameBuilder<AssetPathEntity>?`  | 构建自定义路径名称                                            | `null`                      |
 
 ### 更详细的使用方法
 
 我们已将常用的调用方法封装在 [example](example) 中。
+
+### 国际化
+
+当你在选择资源的时候，package 会通过你的 `BuildContext`
+读取 `Locale?`，返回对应语言的文字代理实现。
+请确保你可以通过 `BuildContext` 获取到 `Locale`，否则将会 **默认展示中文文字**。
+
+内置的语言文字实现有：
+* 简体中文 (默认)
+* English
+* העברית
+* Deutsche
+* Локализация
+* 日本語
+* مة العربية
+* Délégué
+
+如果你想使用自定义或固定的文字实现，请通过
+`AssetPickerConfig.textDelegate` 传递调用。
 
 ### 使用自定义代理
 
@@ -367,7 +413,7 @@ W/Glide   (21133): Failed to find GeneratedAppGlideModule. You should include an
 [IntelliJ IDEA](https://www.jetbrains.com/idea/?from=fluttercandies)
 等 IDE 的授权。
 
-[<img src="https://github.com/fluttercandies/flutter_wechat_assets_picker/raw/master/.github/jetbrains-variant.png" width="200"/>](https://www.jetbrains.com/?from=fluttercandies)
+[<img src="https://github.com/fluttercandies/flutter_wechat_assets_picker/raw/main/.github/jetbrains-variant.png" width="200"/>](https://www.jetbrains.com/?from=fluttercandies)
 
 
 [photo_manager pub]: https://pub.flutter-io.cn/packages/photo_manager

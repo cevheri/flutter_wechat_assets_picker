@@ -164,9 +164,12 @@ class PickMethod {
                     final DefaultAssetPickerBuilderDelegate builder =
                         picker.builder as DefaultAssetPickerBuilderDelegate;
                     final DefaultAssetPickerProvider p = builder.provider;
-                    p.currentPath =
-                        await p.currentPath!.obtainForNewProperties();
-                    await p.switchPath(p.currentPath);
+                    await p.switchPath(
+                      PathWrapper<AssetPathEntity>(
+                        path:
+                            await p.currentPath!.path.obtainForNewProperties(),
+                      ),
+                    );
                     p.selectAsset(result);
                   },
                   child: const Center(
@@ -370,6 +373,24 @@ class PickMethod {
               Colors.lightBlueAccent,
               light: true,
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  factory PickMethod.pathNameBuilder(int maxAssetsCount) {
+    return PickMethod(
+      icon: '🈸',
+      name: 'Path name builder',
+      description: 'Add 🍭 after paths name.',
+      method: (BuildContext context, List<AssetEntity> assets) {
+        return AssetPicker.pickAssets(
+          context,
+          pickerConfig: AssetPickerConfig(
+            maxAssets: maxAssetsCount,
+            selectedAssets: assets,
+            pathNameBuilder: (AssetPathEntity path) => '${path.name}🍭',
           ),
         );
       },

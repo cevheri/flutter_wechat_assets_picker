@@ -235,29 +235,27 @@ abstract class AssetPickerViewerBuilderDelegate<Asset, Path> {
       ValueNotifier<int>(selectedCount);
 
   void unSelectAsset(Asset entity) {
-    provider?.unSelectAssetEntity(entity);
+    provider?.unSelectAsset(entity);
+    selectorProvider?.unSelectAsset(entity);
     if (!isSelectedPreviewing) {
       selectedAssets?.remove(entity);
     }
-    if (selectedCount != selectedNotifier.value) {
-      selectedNotifier.value = selectedCount;
-    }
+    selectedNotifier.value = selectedCount;
   }
 
   void selectAsset(Asset entity) {
     if (maxAssets != null && selectedCount >= maxAssets!) {
       return;
     }
-    provider?.selectAssetEntity(entity);
+    provider?.selectAsset(entity);
+    selectorProvider?.selectAsset(entity);
     if (!isSelectedPreviewing) {
       selectedAssets?.add(entity);
     }
-    if (selectedCount != selectedNotifier.value) {
-      selectedNotifier.value = selectedCount;
-    }
+    selectedNotifier.value = selectedCount;
   }
 
-  Future<void> onChangingSelected(
+  Future<bool> onChangingSelected(
     BuildContext context,
     Asset asset,
     bool isSelected,
@@ -268,13 +266,14 @@ abstract class AssetPickerViewerBuilderDelegate<Asset, Path> {
       isSelected,
     );
     if (selectPredicateResult == false) {
-      return;
+      return false;
     }
     if (isSelected) {
       unSelectAsset(asset);
-      return;
+    } else {
+      selectAsset(asset);
     }
-    selectAsset(asset);
+    return true;
   }
 
   /// Method to switch [isDisplayingDetail].
@@ -285,6 +284,7 @@ abstract class AssetPickerViewerBuilderDelegate<Asset, Path> {
 
   /// Sync selected assets currently with asset picker provider.
   /// 在预览中当前已选的图片同步到选择器的状态
+  @Deprecated('The method is not used by the package anymore')
   Future<bool> syncSelectedAssetsWhenPop() async {
     if (provider?.currentlySelectedAssets != null) {
       selectorProvider?.selectedAssets = provider!.currentlySelectedAssets;
@@ -790,47 +790,55 @@ class DefaultAssetPickerViewerBuilderDelegate
             'Viewer provider must not be null '
             'when the special type is not WeChat moment.',
           );
-          return MaterialButton(
-            minWidth: () {
-              if (isWeChatMoment && hasVideo) {
-                return 48.0;
-              }
-              return provider!.isSelectedNotEmpty ? 48.0 : 20.0;
-            }(),
-            height: 32.0,
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            color: themeData.colorScheme.secondary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(3.0),
-            ),
-            onPressed: () {
-              if (isWeChatMoment && hasVideo) {
-                Navigator.of(context).pop(<AssetEntity>[currentAsset]);
-                return;
-              }
-              if (provider!.isSelectedNotEmpty) {
-                Navigator.of(context).pop(provider.currentlySelectedAssets);
-                return;
-              }
-              selectAsset(currentAsset);
+          Future<void> onPressed() async {
+            if (isWeChatMoment && hasVideo) {
+              Navigator.of(context).pop(<AssetEntity>[currentAsset]);
+              return;
+            }
+            if (provider!.isSelectedNotEmpty) {
+              Navigator.of(context).pop(provider.currentlySelectedAssets);
+              return;
+            }
+            if (await onChangingSelected(context, currentAsset, false)) {
               Navigator.of(context).pop(
                 selectedAssets ?? <AssetEntity>[currentAsset],
               );
-            },
+            }
+          }
+
+          String buildText() {
+            if (isWeChatMoment && hasVideo) {
+              return textDelegate.confirm;
+            }
+            if (provider!.isSelectedNotEmpty) {
+              return '${textDelegate.confirm}'
+                  ' (${provider.currentlySelectedAssets.length}'
+                  '/'
+                  '${selectorProvider!.maxAssets})';
+            }
+            return textDelegate.confirm;
+          }
+
+          final bool isButtonEnabled = provider == null ||
+              provider.currentlySelectedAssets.isNotEmpty ||
+              previewAssets.isEmpty ||
+              selectedNotifier.value == 0;
+          return MaterialButton(
+            minWidth:
+                (isWeChatMoment && hasVideo) || provider!.isSelectedNotEmpty
+                    ? 48
+                    : 20,
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            color: themeData.colorScheme.secondary,
+            disabledColor: themeData.dividerColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(3),
+            ),
+            onPressed: isButtonEnabled ? onPressed : null,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             child: ScaleText(
-              () {
-                if (isWeChatMoment && hasVideo) {
-                  return textDelegate.confirm;
-                }
-                if (provider!.isSelectedNotEmpty) {
-                  return '${textDelegate.confirm}'
-                      ' (${provider.currentlySelectedAssets.length}'
-                      '/'
-                      '${selectorProvider!.maxAssets})';
-                }
-                return textDelegate.confirm;
-              }(),
+              buildText(),
               style: TextStyle(
                 color: themeData.textTheme.bodyText1?.color,
                 fontSize: 17,
@@ -971,35 +979,32 @@ class DefaultAssetPickerViewerBuilderDelegate
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: syncSelectedAssetsWhenPop,
-      child: Theme(
-        data: themeData,
-        child: AnnotatedRegion<SystemUiOverlayStyle>(
-          value: themeData.appBarTheme.systemOverlayStyle ??
-              (themeData.effectiveBrightness.isDark
-                  ? SystemUiOverlayStyle.light
-                  : SystemUiOverlayStyle.dark),
-          child: Material(
-            color: themeData.colorScheme.onSecondary,
-            child: Stack(
-              children: <Widget>[
-                Positioned.fill(child: _pageViewBuilder(context)),
-                if (isWeChatMoment && hasVideo) ...<Widget>[
-                  momentVideoBackButton(context),
-                  PositionedDirectional(
-                    end: 16,
-                    bottom: context.bottomPadding + 16,
-                    child: confirmButton(context),
-                  ),
-                ] else ...<Widget>[
-                  appBar(context),
-                  if (selectedAssets != null ||
-                      (isWeChatMoment && hasVideo && isAppleOS))
-                    bottomDetailBuilder(context),
-                ],
+    return Theme(
+      data: themeData,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: themeData.appBarTheme.systemOverlayStyle ??
+            (themeData.effectiveBrightness.isDark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark),
+        child: Material(
+          color: themeData.colorScheme.onSecondary,
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(child: _pageViewBuilder(context)),
+              if (isWeChatMoment && hasVideo) ...<Widget>[
+                momentVideoBackButton(context),
+                PositionedDirectional(
+                  end: 16,
+                  bottom: context.bottomPadding + 16,
+                  child: confirmButton(context),
+                ),
+              ] else ...<Widget>[
+                appBar(context),
+                if (selectedAssets != null ||
+                    (isWeChatMoment && hasVideo && isAppleOS))
+                  bottomDetailBuilder(context),
               ],
-            ),
+            ],
           ),
         ),
       ),

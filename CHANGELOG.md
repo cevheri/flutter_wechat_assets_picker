@@ -4,6 +4,92 @@ that can be found in the LICENSE file. -->
 
 # Changelog
 
+## 8.1.4
+
+### Fixes
+
+- Fix conditions with the confirm button on iOS. (#376)
+
+## 8.1.3
+
+### Improvements
+
+- Bump `photo_manager` to explicitly remove the requirements of `requiredLegacyExternalStorage`.
+
+## 8.1.2
+
+### Fixes
+
+- Fix conditions with the confirm button. (#371)
+
+## 8.1.1
+
+### Fixes
+
+- Fix conditions with the confirm button. (#367)
+
+## 8.1.0
+
+### New features
+
+- Upgrade `photo_manager` for Android 13. (#365)
+
+### Improvements
+
+- Improve `BuildContext` usages to obtain the correct directionality for the assets grid. (#359)
+- Provide a better condition to the confirm button
+  to make sure it displays correctly in all cases on iOS/macOS. (#359)
+- Improve `bottomActionBar` in `DefaultAssetPickerBuilderDelegate`. (#359)
+
+### Fixes
+
+- Fix invalid path sort. (#364)
+
+## 8.0.2
+
+### Improvements
+
+- Adapt Flutter 3.3. (#354)
+
+## 8.0.1
+
+### Fixes
+
+- Fix not updated empty flag in `DefaultAssetPickerProvider`. (#353)
+
+## 8.0.0
+
+To know more about breaking changes, see [Migration Guide][].
+
+### New Features
+
+- Introduce `PathWrapper` in delegates to improve the overall loading speed. (#338)
+- Allow using `Key` during picking. (#339)
+- Add `initializeDelayDuration` for `DefaultAssetPickerProvider`. (#341)
+- Prevent race condition with paths. (#342)
+- Expose `sortPathsByModifiedDate`. (#343)
+
+### Fixes
+
+- Unify indicators usage to avoid accidentally indicator switching. (#344)
+
+## 7.3.2
+
+### Improvements
+
+- Improve `onChangingSelected` in `AssetPickerViewerBuilderDelegate`. (#332)
+- Fix typo in `README.md`. (#333)
+
+### Fixes
+
+- Fix behaviors when unselecting all assets in the viewer. (#335)
+
+## 7.3.1
+
+### Improvements
+
+- Improve selection callers between picker and viewer. (#327)
+
 ## 7.3.0
 
 Migrate to Flutter 3, drop supports for previous Flutter versions.
