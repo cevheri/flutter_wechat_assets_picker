@@ -8,7 +8,7 @@ that can be found in the LICENSE file. -->
 [![pub package](https://img.shields.io/pub/v/wechat_assets_picker?color=42a012&include_prereleases&label=dev&logo=dart&style=flat-square)](https://pub.dev/packages/wechat_assets_picker)
 [![Build status](https://img.shields.io/github/workflow/status/fluttercandies/flutter_wechat_assets_picker/Build%20test?label=CI&logo=github&style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/actions?query=workflow%3A%22Build+test%22)
 [![CodeFactor](https://img.shields.io/codefactor/grade/github/fluttercandies/flutter_wechat_assets_picker?logo=codefactor&logoColor=%23ffffff&style=flat-square)](https://www.codefactor.io/repository/github/fluttercandies/flutter_wechat_assets_picker)
-[![GitHub license](https://img.shields.io/github/license/fluttercandies/flutter_wechat_assets_picker?style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/blob/master/LICENSE)
+[![GitHub license](https://img.shields.io/github/license/fluttercandies/flutter_wechat_assets_picker?style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/blob/main/LICENSE)
 
 [![Awesome Flutter](https://img.shields.io/badge/Awesome-Flutter-blue.svg?longCache=true&style=flat-square)](https://github.com/Solido/awesome-flutter)
 [![GitHub stars](https://img.shields.io/github/stars/fluttercandies/flutter_wechat_assets_picker?logo=github&style=flat-square)](https://github.com/fluttercandies/flutter_wechat_assets_picker/stargazers)
@@ -17,7 +17,7 @@ that can be found in the LICENSE file. -->
 
 Language: English | [中文](README-ZH.md)
 
-An **assets' picker** based on the WeChat's UI,
+An **assets' picker** (audio/video/image picker) based on the WeChat's UI,
 using [photo_manager][photo_manager pub] for asset implementation,
 [extended_image][extended_image pub]
 for image preview,
@@ -41,11 +41,13 @@ UI designs will be updated following the WeChat update in anytime.
   * [Versions compatibility](#versions-compatibility)
   * [Flutter](#flutter)
   * [Android](#android)
+    * [Permissions](#permissions)
   * [iOS](#ios)
   * [macOS](#macos)
 * [Usage](#usage-)
   * [Simple usage](#simple-usage)
   * [Detailed usage](#detailed-usage)
+  * [Localizations](#localizations)
   * [Using custom delegate](#using-custom-delegate)
   * [Display selected assets](#display-selected-assets)
   * [Register assets change observe callback](#register-assets-change-observe-callback)
@@ -69,13 +71,14 @@ See [Migration Guide][].
   - 🔬 HEIF Image type support
 - 🎥 Video asset support
 - 🎶 Audio asset support
+  - ⚠️ Due to limitations on iOS/macOS, audio can only be fetched within the sandbox
 - 1️⃣ Single asset mode
 - 💱 i18n support
   - ⏪ RTL language support
-- ➕ Special item builder (prepend/append) support
+- ➕ Special item builder support
 - 🗂 Custom sort path delegate support
 - 📝 Custom text delegate support
-- ⏳ Custom filter options support ( `photo_manager` )
+- ⏳ Custom filter options support
 - 🎏 Fully customizable theme
 - 💻 macOS support
 
@@ -102,11 +105,12 @@ before you have any questions.
 
 ### Versions compatibility
 
-|        | 2.8.0 | 2.10.0 | 3.0.0 |
-|--------|:-----:|:------:|:-----:|
-| 7.3.0+ |  N/A  |  N/A   |   ✅   |
-| 7.0.0+ |   ✅   |   ✅    |   ❌   |
-| 6.3.0+ |   ✅   |   ✅    |   ❌   |
+|        | 2.8.0 | 2.10.0 | 3.0.0 | 3.3.0 |
+|--------|:-----:|:------:|:-----:|:-----:|
+| 8.0.0+ |  N/A  |  N/A   |   ✅   |   ✅   |
+| 7.3.0+ |  N/A  |  N/A   |   ✅   |   ✅   |
+| 7.0.0+ |   ✅   |   ✅    |   ❌   |   ❌   |
+| 6.3.0+ |   ✅   |   ✅    |   ❌   |   ❌   |
 
 If you got a `resolve conflict` error when running `flutter pub get`,
 please use `dependency_overrides` to fix it.
@@ -133,26 +137,49 @@ import 'package:wechat_assets_picker/wechat_assets_picker.dart';
 
 ### Android
 
-Required permissions: `READ_EXTERNAL_STORAGE` (declared already).
-Optional permissions: `WRITE_EXTERNAL_STORAGE`, `ACCESS_MEDIA_LOCATION`.
-
-If you're targeting Android SDK 29+,
-you must declare `requestLegacyExternalStorage`
-at the `<application>` node of `AndroidManifest.xml`.
-See the example for the detailed usage.
-
 If you found some warning logs with `Glide` appearing,
 then the main project needs an implementation of `AppGlideModule`.
 See [Generated API docs][].
+
+#### Permissions
+
+When using the package, please upgrade
+`targetSdkVersion` and `compileSdkVersion` to `33`.
+Otherwise, no assets can be fetched on Android 13.
+
+| Name                     | Required | Declared | Max API Level | Others                       |
+|--------------------------|----------|----------|---------------|------------------------------|
+| `READ_EXTERNAL_STORAGE`  | YES      | YES      | 32            |                              |
+| `WRITE_EXTERNAL_STORAGE` | NO       | NO       | 29            |                              |
+| `ACCESS_MEDIA_LOCATION`  | YES*     | NO       | N/A           | Required when reading EXIF   |
+| `READ_MEDIA_IMAGES`      | YES*     | YES      | N/A           | Required when reading images | 
+| `READ_MEDIA_VIDEO`       | YES*     | YES      | N/A           | Required when reading videos | 
+| `READ_MEDIA_AUDIO`       | YES*     | YES      | N/A           | Required when reading audios | 
+
+If you're targeting Android SDK 33+,
+and you don't need to load photos, videos or audios,
+consider removing relevant permission in your apps, more specifically:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.your.app">
+    <!-- Remove READ_MEDIA_IMAGES if you don't need to load photos. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <!-- Remove READ_MEDIA_VIDEO if you don't need to load videos. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
+    <!-- Remove READ_MEDIA_AUDIO if you don't need to load audios. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove" />
+</manifest>
+```
 
 ### iOS
 
 1. Platform version has to be at least *9.0*.
    Modify `ios/Podfile` and update accordingly.
-```ruby
-platform :ios, '9.0'
-```
-
+   ```ruby
+   platform :ios, '9.0'
+   ```
 2. Add the following content to `info.plist`.
 ```plist
 <key>NSAppTransportSecurity</key>
@@ -168,9 +195,9 @@ platform :ios, '9.0'
 
 1. Platform version has to be at least *10.15*.
    Modify `macos/Podfile` and update accordingly.
-```ruby
-platform :osx, '10.15'
-```
+   ```ruby
+   platform :osx, '10.15'
+   ```
 2. Set the minimum deployment target to *10.15*.
    Use XCode to open `macos/Runner.xcworkspace` .
 3. ![step 1](https://tva1.sinaimg.cn/large/007S8ZIlgy1ghw67v4yk4j30qy0b50u0.jpg)
@@ -196,35 +223,57 @@ final List<AssetEntity>? result = await AssetPicker.pickAssets(
 
 Fields in `AssetPickerConfig`:
 
-| Name                              | Type                                 | Description                                                               | Default                     |
-|-----------------------------------|--------------------------------------|---------------------------------------------------------------------------|-----------------------------|
-| selectedAssets                    | `List<AssetEntity>?`                 | Selected assets. Prevent duplicate selection.                             | `null`                      |
-| maxAssets                         | `int`                                | Maximum asset that the picker can pick.                                   | 9                           |
-| pageSize                          | `int?`                               | Number of assets per page. **Must be a multiple of `gridCount`**.         | 80                          |
-| gridThumbnailSize                 | `ThumbnailSize`                      | Thumbnail size for the grid's item.                                       | `ThumbnailSize.square(200)` |
-| pathThumbnailSize                 | `ThumbnailSize`                      | Thumbnail size for the path selector.                                     | `ThumbnailSize.square(80)`  |
-| previewThumbnailSize              | `ThumbnailSize?`                     | Preview thumbnail size in the viewer.                                     | `null`                      |
-| requestType                       | `RequestType`                        | Request type for picker.                                                  | `RequestType.common`        |
-| specialPickerType                 | `SpacialPickerType?`                 | Provides the option to integrate a custom picker type.                    | `null`                      |
-| keepScrollOffset                  | `bool`                               | Whether the picker should save the scroll offset between pushes and pops. | `null`                      |
-| sortPathDelegate                  | `SortPathDelegate<AssetPathEntity>?` | Path entities sort delegate for the picker, sort paths as you want.       | `CommonSortPathDelegate`    |
-| filterOptions                     | `FilterOptionGroup?`                 | Allow users to customize assets filter options.                           | `null`                      |
-| gridCount                         | `int`                                | Grid count in picker.                                                     | 4                           |
-| themeColor                        | `Color?`                             | Main theme color for the picker.                                          | `Color(0xff00bc56)`         |
-| pickerTheme                       | `ThemeData?`                         | Theme data provider for the picker and the viewer.                        | `null`                      |
-| textDelegate                      | `AssetPickerTextDelegate?`           | Text delegate for the picker, for customize the texts.                    | `AssetPickerTextDelegate()` |
-| specialItemPosition               | `SpecialItemPosition`                | Allow users set a special item in the picker with several positions.      | `SpecialItemPosition.none`  |
-| specialItemBuilder                | `SpecialItemBuilder?`                | The widget builder for the special item.                                  | `null`                      |
-| loadingIndicatorBuilder           | `IndicatorBuilder?`                  | Indicates the loading status for the builder.                             | `null`                      |
-| selectPredicate                   | `AssetSelectPredicate`               | Predicate whether an asset can be selected or unselected.                 | `null`                      |
-| shouldRevertGrid                  | `bool?`                              | Whether the assets grid should revert.                                    | `null`                      |
-| limitedPermissionOverlayPredicate | `LimitedPermissionOverlayPredicate?` | Predicate whether the limited permission overlay should be displayed.     | `null`                      |
-| pathNameBuilder                   | `PathNameBuilder<AssetPathEntity>?`  | Build customized path name.                                               | `null`                      |
+| Name                              | Type                                 | Description                                                                                  | Default                     |
+|-----------------------------------|--------------------------------------|----------------------------------------------------------------------------------------------|-----------------------------|
+| selectedAssets                    | `List<AssetEntity>?`                 | Selected assets. Prevent duplicate selection.                                                | `null`                      |
+| maxAssets                         | `int`                                | Maximum asset that the picker can pick.                                                      | 9                           |
+| pageSize                          | `int?`                               | Number of assets per page. **Must be a multiple of `gridCount`**.                            | 80                          |
+| gridThumbnailSize                 | `ThumbnailSize`                      | Thumbnail size for the grid's item.                                                          | `ThumbnailSize.square(200)` |
+| pathThumbnailSize                 | `ThumbnailSize`                      | Thumbnail size for the path selector.                                                        | `ThumbnailSize.square(80)`  |
+| previewThumbnailSize              | `ThumbnailSize?`                     | Preview thumbnail size in the viewer.                                                        | `null`                      |
+| requestType                       | `RequestType`                        | Request type for picker.                                                                     | `RequestType.common`        |
+| specialPickerType                 | `SpecialPickerType?`                 | Provides the option to integrate a custom picker type.                                       | `null`                      |
+| keepScrollOffset                  | `bool`                               | Whether the picker should save the scroll offset between pushes and pops.                    | `null`                      |
+| sortPathDelegate                  | `SortPathDelegate<AssetPathEntity>?` | Path entities sort delegate for the picker, sort paths as you want.                          | `CommonSortPathDelegate`    |
+| sortPathsByModifiedDate           | `bool`                               | Whether to allow sort delegates to sort paths with `FilterOptionGroup.containsPathModified`. | `false`                     |
+| filterOptions                     | `FilterOptionGroup?`                 | Allow users to customize assets filter options.                                              | `null`                      |
+| gridCount                         | `int`                                | Grid count in picker.                                                                        | 4                           |
+| themeColor                        | `Color?`                             | Main theme color for the picker.                                                             | `Color(0xff00bc56)`         |
+| pickerTheme                       | `ThemeData?`                         | Theme data provider for the picker and the viewer.                                           | `null`                      |
+| textDelegate                      | `AssetPickerTextDelegate?`           | Text delegate for the picker, for customize the texts.                                       | `AssetPickerTextDelegate()` |
+| specialItemPosition               | `SpecialItemPosition`                | Allow users set a special item in the picker with several positions.                         | `SpecialItemPosition.none`  |
+| specialItemBuilder                | `SpecialItemBuilder?`                | The widget builder for the special item.                                                     | `null`                      |
+| loadingIndicatorBuilder           | `IndicatorBuilder?`                  | Indicates the loading status for the builder.                                                | `null`                      |
+| selectPredicate                   | `AssetSelectPredicate`               | Predicate whether an asset can be selected or unselected.                                    | `null`                      |
+| shouldRevertGrid                  | `bool?`                              | Whether the assets grid should revert.                                                       | `null`                      |
+| limitedPermissionOverlayPredicate | `LimitedPermissionOverlayPredicate?` | Predicate whether the limited permission overlay should be displayed.                        | `null`                      |
+| pathNameBuilder                   | `PathNameBuilder<AssetPathEntity>?`  | Build customized path name.                                                                  | `null`                      |
 
 ### Detailed usage
 
 TL;DR, we've put multiple common usage
 with the packages in the [example](example).
+
+### Localizations
+
+When you're picking assets, the package will obtain the `Locale?`
+from your `BuildContext`, and return the corresponding text delegate
+of the current language.
+Make sure you have a valid `Locale` in your widget tree that can be accessed
+from the `BuildContext`. Otherwise, **the default Chinese delegate will be used.**
+
+Embedded text delegates languages are:
+* 简体中文 (default)
+* English
+* העברית
+* Deutsche
+* Локализация
+* 日本語
+* مة العربية
+* Délégué
+
+If you want to use a custom/fixed text delegate, pass it through the
+`AssetPickerConfig.textDelegate`.
 
 ### Using custom delegate
 
@@ -375,29 +424,34 @@ Many thanks to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
 <table>
-  <tr>
-    <td align="center"><a href="https://blog.alexv525.com"><img src="https://avatars1.githubusercontent.com/u/15884415?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Alex Li</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=AlexV525" title="Code">💻</a> <a href="#design-AlexV525" title="Design">🎨</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=AlexV525" title="Documentation">📖</a> <a href="#example-AlexV525" title="Examples">💡</a> <a href="#ideas-AlexV525" title="Ideas, Planning, & Feedback">🤔</a> <a href="#maintenance-AlexV525" title="Maintenance">🚧</a> <a href="#question-AlexV525" title="Answering Questions">💬</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/pulls?q=is%3Apr+reviewed-by%3AAlexV525" title="Reviewed Pull Requests">👀</a></td>
-    <td align="center"><a href="https://www.kikt.top"><img src="https://avatars0.githubusercontent.com/u/14145407?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Caijinglong</b></sub></a><br /><a href="#example-CaiJingLong" title="Examples">💡</a> <a href="#ideas-CaiJingLong" title="Ideas, Planning, & Feedback">🤔</a></td>
-    <td align="center"><a href="https://github.com/SchnMar"><img src="https://avatars3.githubusercontent.com/u/12902321?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Marcel Schneider</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3ASchnMar" title="Bug reports">🐛</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=SchnMar" title="Code">💻</a> <a href="#ideas-SchnMar" title="Ideas, Planning, & Feedback">🤔</a></td>
-    <td align="center"><a href="https://github.com/ganlanshu0211"><img src="https://avatars0.githubusercontent.com/u/9670379?v=4?s=50" width="50px;" alt=""/><br /><sub><b>ganlanshu0211</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Aganlanshu0211" title="Bug reports">🐛</a> <a href="#ideas-ganlanshu0211" title="Ideas, Planning, & Feedback">🤔</a></td>
-    <td align="center"><a href="https://github.com/JasonHezz"><img src="https://avatars3.githubusercontent.com/u/15358765?v=4?s=50" width="50px;" alt=""/><br /><sub><b>JasonHezz</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3AJasonHezz" title="Bug reports">🐛</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=JasonHezz" title="Code">💻</a></td>
-    <td align="center"><a href="https://github.com/yanivshaked"><img src="https://avatars.githubusercontent.com/u/13107481?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Yaniv Shaked</b></sub></a><br /><a href="#translation-yanivshaked" title="Translation">🌍</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=yanivshaked" title="Code">💻</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Ayanivshaked" title="Bug reports">🐛</a> <a href="#maintenance-yanivshaked" title="Maintenance">🚧</a></td>
-    <td align="center"><a href="https://github.com/avi-yadav"><img src="https://avatars.githubusercontent.com/u/7314430?v=4?s=50" width="50px;" alt=""/><br /><sub><b>avi-yadav</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=avi-yadav" title="Code">💻</a></td>
-  </tr>
-  <tr>
-    <td align="center"><a href="https://github.com/Letalus"><img src="https://avatars.githubusercontent.com/u/41230136?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Letalus</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3ALetalus" title="Bug reports">🐛</a> <a href="#translation-Letalus" title="Translation">🌍</a></td>
-    <td align="center"><a href="https://github.com/greymag"><img src="https://avatars.githubusercontent.com/u/1502131?v=4?s=50" width="50px;" alt=""/><br /><sub><b>greymag</b></sub></a><br /><a href="#translation-greymag" title="Translation">🌍</a></td>
-    <td align="center"><a href="https://github.com/NaikSoftware"><img src="https://avatars.githubusercontent.com/u/4218994?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Nickolay Savchenko</b></sub></a><br /><a href="#design-NaikSoftware" title="Design">🎨</a></td>
-    <td align="center"><a href="https://github.com/KosukeSaigusa"><img src="https://avatars.githubusercontent.com/u/13669049?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Kosuke Saigusa</b></sub></a><br /><a href="#translation-KosukeSaigusa" title="Translation">🌍</a></td>
-    <td align="center"><a href="https://github.com/Jon-Millent"><img src="https://avatars.githubusercontent.com/u/17584565?v=4?s=50" width="50px;" alt=""/><br /><sub><b>三闻书店</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=Jon-Millent" title="Documentation">📖</a></td>
-    <td align="center"><a href="https://github.com/didiosn"><img src="https://avatars.githubusercontent.com/u/15895051?v=4?s=50" width="50px;" alt=""/><br /><sub><b>DidiosFaust</b></sub></a><br /><a href="#translation-didiosn" title="Translation">🌍</a></td>
-    <td align="center"><a href="https://github.com/ConanXie"><img src="https://avatars.githubusercontent.com/u/10040846?v=4?s=50" width="50px;" alt=""/><br /><sub><b>xiejie</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3AConanXie" title="Bug reports">🐛</a></td>
-  </tr>
-  <tr>
-    <td align="center"><a href="https://github.com/maxzod"><img src="https://avatars.githubusercontent.com/u/47630729?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Ahmed Masoud </b></sub></a><br /><a href="#translation-maxzod" title="Translation">🌍</a></td>
-    <td align="center"><a href="https://github.com/luomo-pro"><img src="https://avatars.githubusercontent.com/u/41097395?v=4?s=50" width="50px;" alt=""/><br /><sub><b>luomo-pro</b></sub></a><br /><a href="#a11y-luomo-pro" title="Accessibility">️️️️♿️</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Aluomo-pro" title="Bug reports">🐛</a></td>
-    <td align="center"><a href="https://github.com/paigupai"><img src="https://avatars.githubusercontent.com/u/44311361?v=4?s=50" width="50px;" alt=""/><br /><sub><b>paigupai</b></sub></a><br /><a href="#translation-paigupai" title="Translation">🌍</a></td>
-  </tr>
+  <tbody>
+    <tr>
+      <td align="center"><a href="https://blog.alexv525.com"><img src="https://avatars1.githubusercontent.com/u/15884415?v=4?s=50" width="50px;" alt="Alex Li"/><br /><sub><b>Alex Li</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=AlexV525" title="Code">💻</a> <a href="#design-AlexV525" title="Design">🎨</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=AlexV525" title="Documentation">📖</a> <a href="#example-AlexV525" title="Examples">💡</a> <a href="#ideas-AlexV525" title="Ideas, Planning, & Feedback">🤔</a> <a href="#maintenance-AlexV525" title="Maintenance">🚧</a> <a href="#question-AlexV525" title="Answering Questions">💬</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/pulls?q=is%3Apr+reviewed-by%3AAlexV525" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center"><a href="https://www.kikt.top"><img src="https://avatars0.githubusercontent.com/u/14145407?v=4?s=50" width="50px;" alt="Caijinglong"/><br /><sub><b>Caijinglong</b></sub></a><br /><a href="#example-CaiJingLong" title="Examples">💡</a> <a href="#ideas-CaiJingLong" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center"><a href="https://github.com/SchnMar"><img src="https://avatars3.githubusercontent.com/u/12902321?v=4?s=50" width="50px;" alt="Marcel Schneider"/><br /><sub><b>Marcel Schneider</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3ASchnMar" title="Bug reports">🐛</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=SchnMar" title="Code">💻</a> <a href="#ideas-SchnMar" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center"><a href="https://github.com/ganlanshu0211"><img src="https://avatars0.githubusercontent.com/u/9670379?v=4?s=50" width="50px;" alt="ganlanshu0211"/><br /><sub><b>ganlanshu0211</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Aganlanshu0211" title="Bug reports">🐛</a> <a href="#ideas-ganlanshu0211" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center"><a href="https://github.com/JasonHezz"><img src="https://avatars3.githubusercontent.com/u/15358765?v=4?s=50" width="50px;" alt="JasonHezz"/><br /><sub><b>JasonHezz</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3AJasonHezz" title="Bug reports">🐛</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=JasonHezz" title="Code">💻</a></td>
+      <td align="center"><a href="https://github.com/yanivshaked"><img src="https://avatars.githubusercontent.com/u/13107481?v=4?s=50" width="50px;" alt="Yaniv Shaked"/><br /><sub><b>Yaniv Shaked</b></sub></a><br /><a href="#translation-yanivshaked" title="Translation">🌍</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=yanivshaked" title="Code">💻</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Ayanivshaked" title="Bug reports">🐛</a> <a href="#maintenance-yanivshaked" title="Maintenance">🚧</a></td>
+      <td align="center"><a href="https://github.com/avi-yadav"><img src="https://avatars.githubusercontent.com/u/7314430?v=4?s=50" width="50px;" alt="avi-yadav"/><br /><sub><b>avi-yadav</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=avi-yadav" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center"><a href="https://github.com/Letalus"><img src="https://avatars.githubusercontent.com/u/41230136?v=4?s=50" width="50px;" alt="Letalus"/><br /><sub><b>Letalus</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3ALetalus" title="Bug reports">🐛</a> <a href="#translation-Letalus" title="Translation">🌍</a></td>
+      <td align="center"><a href="https://github.com/greymag"><img src="https://avatars.githubusercontent.com/u/1502131?v=4?s=50" width="50px;" alt="greymag"/><br /><sub><b>greymag</b></sub></a><br /><a href="#translation-greymag" title="Translation">🌍</a></td>
+      <td align="center"><a href="https://github.com/NaikSoftware"><img src="https://avatars.githubusercontent.com/u/4218994?v=4?s=50" width="50px;" alt="Nickolay Savchenko"/><br /><sub><b>Nickolay Savchenko</b></sub></a><br /><a href="#design-NaikSoftware" title="Design">🎨</a></td>
+      <td align="center"><a href="https://github.com/KosukeSaigusa"><img src="https://avatars.githubusercontent.com/u/13669049?v=4?s=50" width="50px;" alt="Kosuke Saigusa"/><br /><sub><b>Kosuke Saigusa</b></sub></a><br /><a href="#translation-KosukeSaigusa" title="Translation">🌍</a></td>
+      <td align="center"><a href="https://github.com/Jon-Millent"><img src="https://avatars.githubusercontent.com/u/17584565?v=4?s=50" width="50px;" alt="三闻书店"/><br /><sub><b>三闻书店</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=Jon-Millent" title="Documentation">📖</a></td>
+      <td align="center"><a href="https://github.com/didiosn"><img src="https://avatars.githubusercontent.com/u/15895051?v=4?s=50" width="50px;" alt="DidiosFaust"/><br /><sub><b>DidiosFaust</b></sub></a><br /><a href="#translation-didiosn" title="Translation">🌍</a></td>
+      <td align="center"><a href="https://github.com/ConanXie"><img src="https://avatars.githubusercontent.com/u/10040846?v=4?s=50" width="50px;" alt="xiejie"/><br /><sub><b>xiejie</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3AConanXie" title="Bug reports">🐛</a></td>
+    </tr>
+    <tr>
+      <td align="center"><a href="https://github.com/maxzod"><img src="https://avatars.githubusercontent.com/u/47630729?v=4?s=50" width="50px;" alt="Ahmed Masoud "/><br /><sub><b>Ahmed Masoud </b></sub></a><br /><a href="#translation-maxzod" title="Translation">🌍</a></td>
+      <td align="center"><a href="https://github.com/luomo-pro"><img src="https://avatars.githubusercontent.com/u/41097395?v=4?s=50" width="50px;" alt="luomo-pro"/><br /><sub><b>luomo-pro</b></sub></a><br /><a href="#a11y-luomo-pro" title="Accessibility">️️️️♿️</a> <a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Aluomo-pro" title="Bug reports">🐛</a></td>
+      <td align="center"><a href="https://github.com/paigupai"><img src="https://avatars.githubusercontent.com/u/44311361?v=4?s=50" width="50px;" alt="paigupai"/><br /><sub><b>paigupai</b></sub></a><br /><a href="#translation-paigupai" title="Translation">🌍</a></td>
+      <td align="center"><a href="https://github.com/taqiabdulaziz"><img src="https://avatars.githubusercontent.com/u/30410316?v=4?s=50" width="50px;" alt="Muhammad Taqi Abdul Aziz"/><br /><sub><b>Muhammad Taqi Abdul Aziz</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/commits?author=taqiabdulaziz" title="Documentation">📖</a></td>
+      <td align="center"><a href="http://blog.1qa.link"><img src="https://avatars.githubusercontent.com/u/8766034?v=4?s=50" width="50px;" alt="何锦余"/><br /><sub><b>何锦余</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Ahellohejinyu" title="Bug reports">🐛</a></td>
+      <td align="center"><a href="https://github.com/leonpesdk"><img src="https://avatars.githubusercontent.com/u/57394644?v=4?s=50" width="50px;" alt="Leon Dudlik"/><br /><sub><b>Leon Dudlik</b></sub></a><br /><a href="https://github.com/fluttercandies/flutter_wechat_assets_picker/issues?q=author%3Aleonpesdk" title="Bug reports">🐛</a></td>
+    </tr>
+  </tbody>
 </table>
 
 <!-- markdownlint-restore -->

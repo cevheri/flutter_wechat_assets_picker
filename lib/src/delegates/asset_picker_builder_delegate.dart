@@ -2,10 +2,9 @@
 // Use of this source code is governed by an Apache license that can be found
 // in the LICENSE file.
 
-import 'dart:async';
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
-import 'dart:typed_data';
+import 'dart:typed_data' as typed_data;
 import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
@@ -21,6 +20,7 @@ import '../constants/extensions.dart';
 import '../constants/typedefs.dart';
 import '../delegates/asset_picker_text_delegate.dart';
 import '../internal/singleton.dart';
+import '../models/path_wrapper.dart';
 import '../provider/asset_picker_provider.dart';
 import '../widget/asset_picker.dart';
 import '../widget/asset_picker_app_bar.dart';
@@ -244,9 +244,8 @@ abstract class AssetPickerBuilderDelegate<Asset, Path> {
   /// 路径单独条目选择组件
   Widget pathEntityWidget({
     required BuildContext context,
-    required Map<Path, Uint8List?> list,
+    required List<PathWrapper<Path>> list,
     required int index,
-    bool isAudio = false,
   });
 
   /// A backdrop widget behind the [pathEntityListWidget].
@@ -359,6 +358,16 @@ abstract class AssetPickerBuilderDelegate<Asset, Path> {
   /// Android设备的选择器布局
   Widget androidLayout(BuildContext context);
 
+  /// Loading indicator.
+  /// 加载指示器
+  ///
+  /// Subclasses need to implement this due to the generic type limitation, and
+  /// not all delegates use [AssetPickerProvider].
+  ///
+  /// See also:
+  /// - [DefaultAssetPickerBuilderDelegate.loadingIndicator] as an example.
+  Widget loadingIndicator(BuildContext context);
+
   /// GIF image type indicator.
   /// GIF 类型图片指示
   Widget gifIndicator(BuildContext context, Asset asset) {
@@ -414,30 +423,13 @@ abstract class AssetPickerBuilderDelegate<Asset, Path> {
     );
   }
 
-  /// Loading indicator.
-  /// 加载指示器
-  Widget loadingIndicator(BuildContext context) {
-    return Center(
-      child: Selector<AssetPickerProvider<Asset, Path>, bool>(
-        selector: (_, AssetPickerProvider<Asset, Path> p) => p.isAssetsEmpty,
-        builder: (BuildContext c, bool isAssetsEmpty, Widget? w) {
-          if (loadingIndicatorBuilder != null) {
-            return loadingIndicatorBuilder!(c, isAssetsEmpty);
-          }
-          if (isAssetsEmpty) {
-            return ScaleText(
-              textDelegate.emptyList,
-              maxScaleFactor: 1.5,
-              semanticsLabel: semanticsTextDelegate.emptyList,
-            );
-          }
-          return w!;
-        },
-        child: PlatformProgressIndicator(
-          color: theme.iconTheme.color,
-          size: context.mediaQuery.size.width / gridCount / 3,
-        ),
-      ),
+  /// Indicator when no assets were found from the current path.
+  /// 当前目录下无资源的显示
+  Widget emptyIndicator(BuildContext context) {
+    return ScaleText(
+      textDelegate.emptyList,
+      maxScaleFactor: 1.5,
+      semanticsLabel: semanticsTextDelegate.emptyList,
     );
   }
 
@@ -520,7 +512,7 @@ abstract class AssetPickerBuilderDelegate<Asset, Path> {
       color: theme.primaryColor.withOpacity(isAppleOS ? 0.90 : 1),
       child: Row(
         children: <Widget>[
-          if (!isSingleAssetMode || !isAppleOS) previewButton(context),
+          if (!isAppleOS) previewButton(context),
           if (isAppleOS) const Spacer(),
           if (isAppleOS) confirmButton(context),
         ],
@@ -800,7 +792,7 @@ class DefaultAssetPickerBuilderDelegate
     if (!isPermissionLimited) {
       return;
     }
-    final AssetPathEntity? currentPathEntity = provider.currentPath;
+    final PathWrapper<AssetPathEntity>? currentWrapper = provider.currentPath;
     if (call.arguments is Map) {
       final Map<dynamic, dynamic> arguments =
           call.arguments as Map<dynamic, dynamic>;
@@ -812,18 +804,19 @@ class DefaultAssetPickerBuilderDelegate
           ..isAssetsEmpty = true;
         return;
       }
-      if (currentPathEntity == null) {
+      if (currentWrapper == null) {
         await provider.getPaths();
       }
     }
-    if (currentPathEntity != null) {
+    if (currentWrapper != null) {
       final AssetPathEntity newPath =
-          await currentPathEntity.obtainForNewProperties();
+          await currentWrapper.path.obtainForNewProperties();
+      final int assetCount = await newPath.assetCountAsync;
       provider
-        ..currentPath = newPath
-        ..hasAssetsToDisplay = newPath.assetCount != 0
-        ..isAssetsEmpty = newPath.assetCount == 0
-        ..totalAssetsCount = newPath.assetCount;
+        ..currentPath = PathWrapper<AssetPathEntity>(path: newPath)
+        ..hasAssetsToDisplay = assetCount != 0
+        ..isAssetsEmpty = assetCount == 0
+        ..totalAssetsCount = assetCount;
       isSwitchingPath.value = false;
       if (newPath.isAll) {
         await provider.getAssetsFromCurrentPath();
@@ -905,13 +898,11 @@ class DefaultAssetPickerBuilderDelegate
       // - On Android, show if preview is enabled or if multi asset mode.
       //   If no preview and single asset mode, do not show confirm button,
       //   because any click on an asset selects it.
-      // - On iOS, show if no preview and multi asset mode. This is because for iOS
-      //   the [bottomActionBar] has the confirm button, but if no preview,
-      //   [bottomActionBar] is not displayed.
-      actions: (!isAppleOS || !isPreviewEnabled) &&
-              (isPreviewEnabled || !isSingleAssetMode)
-          ? <Widget>[confirmButton(context)]
-          : null,
+      // - On iOS and macOS, show nothing.
+      actions: <Widget>[
+        if (!isAppleOS && (isPreviewEnabled || !isSingleAssetMode))
+          confirmButton(context),
+      ],
       actionsPadding: const EdgeInsetsDirectional.only(end: 14),
       blurRadius: isAppleOS ? appleOSBlurRadius : 0,
     );
@@ -961,7 +952,7 @@ class DefaultAssetPickerBuilderDelegate
             child: Stack(
               children: <Widget>[
                 Positioned.fill(child: assetsGridBuilder(context)),
-                if ((!isSingleAssetMode || isAppleOS) && isPreviewEnabled)
+                if (!isSingleAssetMode || isPreviewEnabled)
                   Positioned.fill(
                     top: null,
                     child: bottomActionBar(context),
@@ -1018,18 +1009,39 @@ class DefaultAssetPickerBuilderDelegate
   }
 
   @override
+  Widget loadingIndicator(BuildContext context) {
+    return Selector<DefaultAssetPickerProvider, bool>(
+      selector: (_, DefaultAssetPickerProvider p) => p.isAssetsEmpty,
+      builder: (BuildContext context, bool isAssetsEmpty, Widget? w) {
+        if (loadingIndicatorBuilder != null) {
+          return loadingIndicatorBuilder!(context, isAssetsEmpty);
+        }
+        return Center(child: isAssetsEmpty ? emptyIndicator(context) : w);
+      },
+      child: PlatformProgressIndicator(
+        color: theme.iconTheme.color,
+        size: context.mediaQuery.size.width / gridCount / 3,
+      ),
+    );
+  }
+
+  @override
   Widget assetsGridBuilder(BuildContext context) {
-    return Selector<DefaultAssetPickerProvider, AssetPathEntity?>(
+    return Selector<DefaultAssetPickerProvider, PathWrapper<AssetPathEntity>?>(
       selector: (_, DefaultAssetPickerProvider p) => p.currentPath,
-      builder: (BuildContext context, AssetPathEntity? path, __) {
+      builder: (
+        BuildContext _context,
+        PathWrapper<AssetPathEntity>? wrapper,
+        __,
+      ) {
         // First, we need the count of the assets.
-        int totalCount = path?.assetCount ?? 0;
+        int totalCount = wrapper?.assetCount ?? 0;
         final Widget? specialItem;
         // If user chose a special item's position, add 1 count.
         if (specialItemPosition != SpecialItemPosition.none) {
           specialItem = specialItemBuilder?.call(
-            context,
-            path,
+            _context,
+            wrapper?.path,
             totalCount,
           );
           if (specialItem != null) {
@@ -1039,8 +1051,7 @@ class DefaultAssetPickerBuilderDelegate
           specialItem = null;
         }
         if (totalCount == 0 && specialItem == null) {
-          return loadingIndicatorBuilder?.call(context, true) ??
-              Center(child: emptyIndicator(context));
+          return loadingIndicator(_context);
         }
         // Then we use the [totalCount] to calculate placeholders we need.
         final int placeholderCount;
@@ -1058,13 +1069,13 @@ class DefaultAssetPickerBuilderDelegate
         // [gridCount] since every grid item is squeezed by the [itemSpacing],
         // and it's actual size is reduced with [itemSpacing / gridCount].
         final double dividedSpacing = itemSpacing / gridCount;
-        final double topPadding = context.topPadding + kToolbarHeight;
+        final double topPadding = _context.topPadding + kToolbarHeight;
 
-        Widget _sliverGrid(BuildContext context, List<AssetEntity> assets) {
+        Widget _sliverGrid(BuildContext _context, List<AssetEntity> assets) {
           return SliverGrid(
             delegate: SliverChildBuilderDelegate(
               (_, int index) => Builder(
-                builder: (BuildContext context) {
+                builder: (BuildContext _context) {
                   if (effectiveShouldRevertGrid) {
                     if (index < placeholderCount) {
                       return const SizedBox.shrink();
@@ -1075,7 +1086,7 @@ class DefaultAssetPickerBuilderDelegate
                     child: Directionality(
                       textDirection: Directionality.of(context),
                       child: assetGridItemBuilder(
-                        context,
+                        _context,
                         index,
                         assets,
                         specialItem: specialItem,
@@ -1085,7 +1096,7 @@ class DefaultAssetPickerBuilderDelegate
                 },
               ),
               childCount: assetsGridItemCount(
-                context: context,
+                context: _context,
                 assets: assets,
                 placeholderCount: placeholderCount,
                 specialItem: specialItem,
@@ -1112,7 +1123,7 @@ class DefaultAssetPickerBuilderDelegate
         }
 
         return LayoutBuilder(
-          builder: (BuildContext c, BoxConstraints constraints) {
+          builder: (BuildContext context, BoxConstraints constraints) {
             final double itemSize = constraints.maxWidth / gridCount;
             // Check whether all rows can be placed at the same time.
             final bool onlyOneScreen = row * itemSize <=
@@ -1144,7 +1155,7 @@ class DefaultAssetPickerBuilderDelegate
                 child: Selector<DefaultAssetPickerProvider, List<AssetEntity>>(
                   selector: (_, DefaultAssetPickerProvider p) =>
                       p.currentAssets,
-                  builder: (_, List<AssetEntity> assets, __) {
+                  builder: (BuildContext context, List<AssetEntity> assets, _) {
                     final SliverGap bottomGap = SliverGap.v(
                       context.bottomPadding + bottomSectionHeight,
                     );
@@ -1156,7 +1167,7 @@ class DefaultAssetPickerBuilderDelegate
                       slivers: <Widget>[
                         if (isAppleOS)
                           SliverGap.v(context.topPadding + kToolbarHeight),
-                        _sliverGrid(_, assets),
+                        _sliverGrid(context, assets),
                         // Ignore the gap when the [anchor] is not equal to 1.
                         if (effectiveShouldRevertGrid && anchor == 1) bottomGap,
                         if (effectiveShouldRevertGrid)
@@ -1198,10 +1209,11 @@ class DefaultAssetPickerBuilderDelegate
     Widget? specialItem,
   }) {
     final int length = currentAssets.length;
-    final AssetPathEntity? currentPathEntity =
-        context.select<DefaultAssetPickerProvider, AssetPathEntity?>(
+    final PathWrapper<AssetPathEntity>? currentWrapper = context
+        .select<DefaultAssetPickerProvider, PathWrapper<AssetPathEntity>?>(
       (DefaultAssetPickerProvider p) => p.currentPath,
     );
+    final AssetPathEntity? currentPathEntity = currentWrapper?.path;
 
     if (specialItem != null) {
       if ((index == 0 && specialItemPosition == SpecialItemPosition.prepend) ||
@@ -1360,10 +1372,11 @@ class DefaultAssetPickerBuilderDelegate
     int placeholderCount = 0,
     Widget? specialItem,
   }) {
-    final AssetPathEntity? currentPathEntity =
-        context.select<DefaultAssetPickerProvider, AssetPathEntity?>(
+    final PathWrapper<AssetPathEntity>? currentWrapper = context
+        .select<DefaultAssetPickerProvider, PathWrapper<AssetPathEntity>?>(
       (DefaultAssetPickerProvider p) => p.currentPath,
     );
+    final AssetPathEntity? currentPathEntity = currentWrapper?.path;
     final int length = assets.length + placeholderCount;
 
     // Return 1 if the [specialItem] build something.
@@ -1459,8 +1472,8 @@ class DefaultAssetPickerBuilderDelegate
           minWidth: p.isSelectedNotEmpty ? 48 : 20,
           height: appBarItemHeight,
           padding: const EdgeInsets.symmetric(horizontal: 12),
+          color: theme.colorScheme.secondary,
           disabledColor: theme.dividerColor,
-          color: p.isSelectedNotEmpty ? themeColor : theme.dividerColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(3),
           ),
@@ -1522,32 +1535,6 @@ class DefaultAssetPickerBuilderDelegate
         if (asset.type == AssetType.video) // 如果为视频则显示标识
           videoIndicator(context, asset),
       ],
-    );
-  }
-
-  Widget emptyIndicator(BuildContext context) {
-    return ScaleText(
-      textDelegate.emptyList,
-      maxScaleFactor: 1.5,
-      semanticsLabel: semanticsTextDelegate.emptyList,
-    );
-  }
-
-  @override
-  Widget loadingIndicator(BuildContext context) {
-    return Center(
-      child: Selector<DefaultAssetPickerProvider, bool>(
-        selector: (_, DefaultAssetPickerProvider p) => p.isAssetsEmpty,
-        builder: (BuildContext context, bool isAssetsEmpty, __) {
-          if (isAssetsEmpty) {
-            return emptyIndicator(context);
-          }
-          return PlatformProgressIndicator(
-            color: theme.iconTheme.color,
-            size: context.mediaQuery.size.width / gridCount / 3,
-          );
-        },
-      ),
     );
   }
 
@@ -1652,17 +1639,23 @@ class DefaultAssetPickerBuilderDelegate
               ),
             ),
             Flexible(
-              child: Consumer<DefaultAssetPickerProvider>(
-                builder: (_, DefaultAssetPickerProvider p, __) {
+              child: Selector<DefaultAssetPickerProvider,
+                  List<PathWrapper<AssetPathEntity>>>(
+                selector: (_, DefaultAssetPickerProvider p) => p.paths,
+                builder: (_, List<PathWrapper<AssetPathEntity>> paths, __) {
+                  final List<PathWrapper<AssetPathEntity>> filtered = paths
+                      .where(
+                        (PathWrapper<AssetPathEntity> p) => p.assetCount != 0,
+                      )
+                      .toList();
                   return ListView.separated(
                     padding: const EdgeInsetsDirectional.only(top: 1),
                     shrinkWrap: true,
-                    itemCount: p.pathsList.length,
+                    itemCount: filtered.length,
                     itemBuilder: (BuildContext c, int i) => pathEntityWidget(
                       context: c,
-                      list: p.pathsList,
+                      list: filtered,
                       index: i,
-                      isAudio: p.requestType == RequestType.audio,
                     ),
                     separatorBuilder: (_, __) => Container(
                       margin: const EdgeInsetsDirectional.only(start: 60),
@@ -1724,30 +1717,34 @@ class DefaultAssetPickerBuilderDelegate
             borderRadius: BorderRadius.circular(999),
             color: theme.dividerColor,
           ),
-          child: Selector<DefaultAssetPickerProvider, AssetPathEntity?>(
+          child: Selector<DefaultAssetPickerProvider,
+              PathWrapper<AssetPathEntity>?>(
             selector: (_, DefaultAssetPickerProvider p) => p.currentPath,
-            builder: (_, AssetPathEntity? p, Widget? w) => Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (p == null && isPermissionLimited)
-                  _text(
-                    context,
-                    textDelegate.changeAccessibleLimitedAssets,
-                    semanticsTextDelegate.changeAccessibleLimitedAssets,
-                  ),
-                if (p != null)
-                  _text(
-                    context,
-                    isPermissionLimited && p.isAll
-                        ? textDelegate.accessiblePathName
-                        : pathNameBuilder?.call(p) ?? p.name,
-                    isPermissionLimited && p.isAll
-                        ? semanticsTextDelegate.accessiblePathName
-                        : pathNameBuilder?.call(p) ?? p.name,
-                  ),
-                w!,
-              ],
-            ),
+            builder: (_, PathWrapper<AssetPathEntity>? p, Widget? w) {
+              final AssetPathEntity? path = p?.path;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (path == null && isPermissionLimited)
+                    _text(
+                      context,
+                      textDelegate.changeAccessibleLimitedAssets,
+                      semanticsTextDelegate.changeAccessibleLimitedAssets,
+                    ),
+                  if (path != null)
+                    _text(
+                      context,
+                      isPermissionLimited && path.isAll
+                          ? textDelegate.accessiblePathName
+                          : pathNameBuilder?.call(path) ?? path.name,
+                      isPermissionLimited && path.isAll
+                          ? semanticsTextDelegate.accessiblePathName
+                          : pathNameBuilder?.call(path) ?? path.name,
+                    ),
+                  w!,
+                ],
+              );
+            },
             child: Padding(
               padding: const EdgeInsetsDirectional.only(start: 5),
               child: DecoratedBox(
@@ -1780,29 +1777,22 @@ class DefaultAssetPickerBuilderDelegate
   @override
   Widget pathEntityWidget({
     required BuildContext context,
-    required Map<AssetPathEntity, Uint8List?> list,
+    required List<PathWrapper<AssetPathEntity>> list,
     required int index,
-    bool isAudio = false,
   }) {
-    final AssetPathEntity pathEntity = list.keys.elementAt(index);
-    final Uint8List? data = list.values.elementAt(index);
+    final PathWrapper<AssetPathEntity> wrapper = list[index];
+    final AssetPathEntity pathEntity = wrapper.path;
+    final typed_data.Uint8List? data = wrapper.thumbnailData;
 
     Widget builder() {
-      if (isAudio) {
+      if (data != null) {
+        return Image.memory(data, fit: BoxFit.cover);
+      }
+      if (pathEntity.type.containsAudio()) {
         return ColoredBox(
           color: theme.colorScheme.primary.withOpacity(0.12),
           child: const Center(child: Icon(Icons.audiotrack)),
         );
-      }
-
-      // The reason that the `thumbData` should be checked at here to see if it
-      // is null is that even the image file is not exist, the `File` can still
-      // returned as it exist, which will cause the thumb bytes return null.
-      //
-      // 此处需要检查缩略图为空的原因是：尽管文件可能已经被删除，
-      // 但通过 `File` 读取的文件对象仍然存在，使得返回的数据为空。
-      if (data != null) {
-        return Image.memory(data, fit: BoxFit.cover);
       }
       return ColoredBox(color: theme.colorScheme.primary.withOpacity(0.12));
     }
@@ -1815,15 +1805,19 @@ class DefaultAssetPickerBuilderDelegate
     final String semanticsName = isPermissionLimited && pathEntity.isAll
         ? semanticsTextDelegate.accessiblePathName
         : pathName;
-    final String semanticsCount = '${pathEntity.assetCount}';
-    return Selector<DefaultAssetPickerProvider, AssetPathEntity?>(
+    final String? semanticsCount = wrapper.assetCount?.toString();
+    final StringBuffer labelBuffer = StringBuffer(
+      '$semanticsName, ${semanticsTextDelegate.sUnitAssetCountLabel}',
+    );
+    if (semanticsCount != null) {
+      labelBuffer.write(': $semanticsCount');
+    }
+    return Selector<DefaultAssetPickerProvider, PathWrapper<AssetPathEntity>?>(
       selector: (_, DefaultAssetPickerProvider p) => p.currentPath,
-      builder: (_, AssetPathEntity? currentPathEntity, __) {
-        final bool isSelected = currentPathEntity == pathEntity;
+      builder: (_, PathWrapper<AssetPathEntity>? currentWrapper, __) {
+        final bool isSelected = currentWrapper?.path == pathEntity;
         return Semantics(
-          label: '$semanticsName, '
-              '${semanticsTextDelegate.sUnitAssetCountLabel}: '
-              '$semanticsCount',
+          label: labelBuffer.toString(),
           selected: isSelected,
           onTapHint: semanticsTextDelegate.sActionSwitchPathLabel,
           button: false,
@@ -1833,9 +1827,7 @@ class DefaultAssetPickerBuilderDelegate
               splashFactory: InkSplash.splashFactory,
               onTap: () {
                 Feedback.forTap(context);
-                context
-                    .read<DefaultAssetPickerProvider>()
-                    .switchPath(pathEntity);
+                context.read<DefaultAssetPickerProvider>().switchPath(wrapper);
                 isSwitchingPath.value = false;
                 gridScrollController.jumpTo(0);
               },
@@ -1868,15 +1860,16 @@ class DefaultAssetPickerBuilderDelegate
                                   ),
                                 ),
                               ),
-                              ScaleText(
-                                '($semanticsCount)',
-                                style: TextStyle(
-                                  color: theme.textTheme.caption?.color,
-                                  fontSize: 17,
+                              if (semanticsCount != null)
+                                ScaleText(
+                                  '($semanticsCount)',
+                                  style: TextStyle(
+                                    color: theme.textTheme.caption?.color,
+                                    fontSize: 17,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
                             ],
                           ),
                         ),
