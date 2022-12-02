@@ -894,8 +894,8 @@ class TurkishAssetPickerTextDelegate extends AssetPickerTextDelegate {
   @override
   String get accessAllTip =>
       'Uygulama, cihazdaki yalnızca bazı dosyalara erişebilir. '
-          'Sistem ayarlarını açın ve uygulamanın şunları yapmasına izin verin'
-          'Cihazdaki tüm dosyalara erişin';
+      'Sistem ayarlarını açın ve uygulamanın şunları yapmasına izin verin '
+      'Cihazdaki tüm dosyalara erişin';
 
   @override
   String get goToSystemSettings => 'Sistem ayarlarına gidin';
